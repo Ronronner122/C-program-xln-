@@ -13,7 +13,7 @@ const QStringList helloTexts = {
 };
 
 const QStringList feedTexts = {
-    "小熊和小兔子都是小猪变得^_^",
+    "小熊和小兔子都是小猪变的^_^",
     "相比于饮料，我觉得身边的你更让我觉得幸福",
     "快速决定午饭吃什么，应该算是很难的问题"
 };
@@ -23,22 +23,44 @@ Widget::Widget(QWidget *parent)
     , m_currentState(Stay)
     , m_isDialogVisible(false)
 {
-    setWindowFlags(Qt::FramelessWindowHint
-                   | Qt::WindowStaysOnTopHint
-                   | Qt::Tool);
-
+    setWindowFlags(Qt::FramelessWindowHint| Qt::WindowStaysOnTopHint| Qt::Tool);
     setAttribute(Qt::WA_TranslucentBackground, true);
     setAttribute(Qt::WA_NoSystemBackground, true);
     setAttribute(Qt::WA_StyledBackground, false);
     setAutoFillBackground(false);
     setFixedSize(150, 150);
 
+    m_movie=new QMovie(this);
+    connect(m_movie,&QMovie::frameChanged,this,qOverload<>(&Widget::update));
     m_dialogTimer = new QTimer(this);
+    m_dialogTimer->setSingleShot(true);
     connect(m_dialogTimer, &QTimer::timeout, this, &Widget::clearDialog);
-
-    initMenu();
+    Menu();
     loadStateImage();
 
+    m_trayIcon=new QSystemTrayIcon(this);
+    m_trayIcon->setIcon(QIcon(":/stay.GIF"));
+    m_trayIcon->setToolTip("Evan");
+    m_trayMenu=new QMenu(this);
+    QAction *actShow=new QAction("显示",this);
+    QAction *actExit = new QAction("退出", this);
+    connect(actShow, &QAction::triggered, this, &Widget::showPet);
+    connect(actExit, &QAction::triggered, qApp, &QApplication::quit);
+    m_trayMenu->addAction(actShow);
+    m_trayMenu->addSeparator();
+    m_trayMenu->addAction(actExit);
+    m_trayIcon->setContextMenu(m_trayMenu);
+
+    //点击托盘图标唤醒
+    connect(m_trayIcon, &QSystemTrayIcon::activated, this, [=](QSystemTrayIcon::ActivationReason reason){
+        if(reason == QSystemTrayIcon::Trigger) {
+            showPet();
+        }
+    });
+
+    //显示托盘图标
+    m_trayIcon->show();
+    //窗口初始位置
     QScreen* screen = QApplication::primaryScreen();
     QRect rect = screen->availableGeometry();
     move(rect.width() - width() - 50, rect.height() - height() - 50);
@@ -48,10 +70,9 @@ Widget::~Widget()
 {
 }
 
-void Widget::initMenu()
+void Widget::Menu()
 {
     m_rightMenu = new QMenu(this);
-
     QAction* actHello = new QAction("打招呼", this);
     QAction* actFeed = new QAction("喂食", this);
     QAction* actStay = new QAction("待机", this);
@@ -62,7 +83,6 @@ void Widget::initMenu()
     QAction* actTire = new QAction("疲惫", this);
     QAction* actHide = new QAction("隐藏", this);
     QAction* actShow = new QAction("显示", this);
-
     connect(actHello, &QAction::triggered, this, &Widget::sayHello);
     connect(actFeed, &QAction::triggered, this, &Widget::feed);
     connect(actStay, &QAction::triggered, this, &Widget::setStateStay);
@@ -73,8 +93,7 @@ void Widget::initMenu()
     connect(actTire, &QAction::triggered, this, &Widget::setStateTiring);
     connect(actHide, &QAction::triggered, this, &Widget::hidePet);
     connect(actShow, &QAction::triggered, this, &Widget::showPet);
-
-    m_rightMenu->addAction(actHello);
+    m_rightMenu->addAction(actHello);//指示当前状态
     m_rightMenu->addAction(actFeed);
     m_rightMenu->addSeparator();
     m_rightMenu->addAction(actStay);
@@ -87,24 +106,23 @@ void Widget::initMenu()
     m_rightMenu->addAction(actHide);
     m_rightMenu->addAction(actShow);
 }
-
 void Widget::loadStateImage()
 {
     QString path;
     switch (m_currentState) {
-    case Stay: path = ":/stay.png"; break;
-    case Happy: path = ":/happy.png"; break;
-    case Questing: path = ":/questing.png"; break;
-    case Studying: path = ":/studying.png"; break;
-    case Sleep: path = ":/sleep.png"; break;
-    case Tiring: path = ":/tiring.png"; break;
-    default: path = ":/stay.png";
+    case Stay: path = ":/stay.GIF"; break;
+    case Happy: path = ":/happy.GIF"; break;
+    case Questing: path = ":/questing.GIF"; break;
+    case Studying: path = ":/studying.GIF"; break;
+    case Sleeping: path = ":/sleeping.GIF"; break;
+    case Tired: path = ":/tired.GIF"; break;
+    default: path = ":/stay.GIF";
     }
-    m_currentPixmap.load(path);
-    m_currentPixmap = m_currentPixmap.scaled(this->size(), Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
+    m_movie->stop();
+    m_movie->setFileName(path);
+    m_movie->start();
     update();
 }
-
 void Widget::paintEvent(QPaintEvent *event)
 {
     Q_UNUSED(event);
@@ -116,15 +134,19 @@ void Widget::paintEvent(QPaintEvent *event)
     painter.fillRect(rect(), Qt::transparent);
     painter.setCompositionMode(QPainter::CompositionMode_SourceOver);
 
-    // 绘制图片
-    painter.drawPixmap(0, 0, m_currentPixmap);
+    //绘制
+    if(m_movie&&m_movie->isValid()){
+        painter.drawPixmap(0,0,m_movie->currentPixmap().scaled(size(),Qt::KeepAspectRatio,Qt::SmoothTransformation));
+    }
+    else{
+        painter.drawPixmap(0,0,m_currentPixmap);
+    }
 
-    // 绘制对话气泡
+    //对话气泡
     if (m_isDialogVisible && !m_dialogText.isEmpty()) {
         painter.setPen(Qt::NoPen);
         painter.setBrush(QColor(255, 255, 255, 230));
         painter.drawRoundedRect(10, 10, 130, 40, 8, 8);
-
         QFont font;
         font.setPointSize(8);
         painter.setFont(font);
@@ -138,12 +160,12 @@ void Widget::mousePressEvent(QMouseEvent *event)
     if (event->button() == Qt::LeftButton) {
         m_dragPos = event->globalPosition().toPoint() - frameGeometry().topLeft();
         event->accept();
-    } else if (event->button() == Qt::RightButton) {
+    }
+    else if (event->button() == Qt::RightButton) {
         m_rightMenu->exec(event->globalPosition().toPoint());
         event->accept();
     }
 }
-
 void Widget::mouseMoveEvent(QMouseEvent *event)
 {
     if (event->buttons() & Qt::LeftButton) {
@@ -151,7 +173,6 @@ void Widget::mouseMoveEvent(QMouseEvent *event)
         event->accept();
     }
 }
-
 void Widget::showDialog(const QString &text)
 {
     m_dialogText = text;
@@ -159,7 +180,6 @@ void Widget::showDialog(const QString &text)
     m_dialogTimer->start(3000);
     update();
 }
-
 void Widget::clearDialog()
 {
     m_isDialogVisible = false;
@@ -171,9 +191,8 @@ void Widget::setStateStay() { m_currentState = Stay; loadStateImage(); }
 void Widget::setStateHappy() { m_currentState = Happy; loadStateImage(); showDialog("我会陪伴在你身边，一起见证晴雨交替。"); }
 void Widget::setStateQuesting() { m_currentState = Questing; loadStateImage(); showDialog("熊的天，这个问题有点难哦"); }
 void Widget::setStateStudying() { m_currentState = Studying; loadStateImage(); showDialog("在思考的间隙，总是忍不住想你"); }
-void Widget::setStateSleep() { m_currentState = Sleep; loadStateImage(); showDialog("你的晚安吻，才是驱散暗云与梦魇的月光"); }
-void Widget::setStateTiring() { m_currentState = Tiring; loadStateImage(); showDialog("只要你在我身边，就是我源源不断的能量源泉"); }
-
+void Widget::setStateSleep() { m_currentState = Sleeping; loadStateImage(); showDialog("你的晚安吻，才是驱散暗云与梦魇的月光"); }
+void Widget::setStateTiring() { m_currentState = Tired; loadStateImage(); showDialog("只要你在我身边，就是我源源不断的能量源泉"); }
 void Widget::sayHello()
 {
     int idx = rand() % helloTexts.size();
@@ -186,6 +205,12 @@ void Widget::feed()
     int idx = rand() % feedTexts.size();
     showDialog(feedTexts[idx]);
 }
-
-void Widget::hidePet() { hide(); }
-void Widget::showPet() { show(); }
+void Widget::hidePet() {
+    this->hide();
+    m_trayIcon->showMessage("Evan藏起来咯","点击唤醒他吧^_^");
+}
+void Widget::showPet() {
+    this->show();
+    this->raise();
+    this->activateWindow();//强制激活窗口
+}
