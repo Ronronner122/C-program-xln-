@@ -28,7 +28,7 @@ Widget::Widget(QWidget *parent)
     setAttribute(Qt::WA_NoSystemBackground, true);
     setAttribute(Qt::WA_StyledBackground, false);
     setAutoFillBackground(false);
-    setFixedSize(150, 150);
+    setFixedSize(150, 260);
 
     m_movie=new QMovie(this);
     connect(m_movie,&QMovie::frameChanged,this,qOverload<>(&Widget::update));
@@ -64,6 +64,55 @@ Widget::Widget(QWidget *parent)
     QScreen* screen = QApplication::primaryScreen();
     QRect rect = screen->availableGeometry();
     move(rect.width() - width() - 50, rect.height() - height() - 50);
+    m_audio = new QAudioOutput(this);
+    m_player = new QMediaPlayer(this);
+    m_player->setAudioOutput(m_audio);
+
+    //3.0新增AI
+    net = new QNetworkAccessManager(this);
+    connect(net, &QNetworkAccessManager::finished, this, &Widget::getReply);
+    //输入框设置
+    QVBoxLayout *ly = new QVBoxLayout(this);
+    ly->setAlignment(Qt::AlignBottom);
+    ly->setContentsMargins(6, 160, 6, 6);
+    input = new QLineEdit(this);
+    input->setPlaceholderText("和Evan聊天...");
+    input->setStyleSheet(R"(
+        QLineEdit {
+            background-color:#FFF5F7;
+            border-radius:10px;
+            padding:6px;
+            font-size:12px;
+            color:#444;
+        }
+    )");
+
+    btn = new QPushButton("发送", this);
+    btn->setStyleSheet(R"(
+        QPushButton {
+            background-color:#FFD1DC;
+            border-radius:10px;
+            padding:6px;
+            font-size:12px;
+        }
+        QPushButton:hover {
+            background-color:#FFC0D9;
+        }
+    )");
+
+    ly->addWidget(input);
+    ly->addWidget(btn);
+    connect(btn, &QPushButton::clicked, this, &Widget::sendAI);
+
+    //3.0，新增音乐播放功能
+    m_rightMenu->addSeparator();
+    m_rightMenu->addAction("此刻", this, &Widget::playMusic1);
+    m_rightMenu->addAction("Light it up", this, &Widget::playMusic2);
+    m_rightMenu->addAction("Meant-To-Be", this, &Widget::playMusic3);
+    m_rightMenu->addAction("寻", this, &Widget::playMusic4);
+    m_rightMenu->addAction("夜色难沉", this, &Widget::playMusic5);
+    m_rightMenu->addAction("永无境", this, &Widget::playMusic6);
+    m_rightMenu->addAction("停止音乐", this, &Widget::stopMusic);
 }
 
 Widget::~Widget()
@@ -129,7 +178,7 @@ void Widget::paintEvent(QPaintEvent *event)
     QPainter painter(this);
     painter.setRenderHint(QPainter::Antialiasing);
 
-    // 清空为完全透明
+    //清空为完全透明
     painter.setCompositionMode(QPainter::CompositionMode_Source);
     painter.fillRect(rect(), Qt::transparent);
     painter.setCompositionMode(QPainter::CompositionMode_SourceOver);
@@ -213,4 +262,65 @@ void Widget::showPet() {
     this->show();
     this->raise();
     this->activateWindow();//强制激活窗口
+}
+//3.0新增
+void Widget::playMusic1(){
+    m_player->setSource(QUrl("qrc:/1.mp3"));
+    m_player->play();
+}
+void Widget::playMusic2(){
+    m_player->setSource(QUrl("qrc:/2.mp3"));
+    m_player->play();
+}
+void Widget::playMusic3(){
+    m_player->setSource(QUrl("qrc:/3.mp3"));
+    m_player->play();
+}
+void Widget::playMusic4(){
+    m_player->setSource(QUrl("qrc:/4.mp3"));
+    m_player->play();
+}
+void Widget::playMusic5(){
+    m_player->setSource(QUrl("qrc:/5.mp3"));
+    m_player->play();
+}
+void Widget::playMusic6(){
+    m_player->setSource(QUrl("qrc:/6s.mp3"));
+    m_player->play();
+}
+void Widget::stopMusic(){
+    m_player->stop();
+}
+
+void Widget::sendAI(){
+    QString txt = input->text().trimmed();
+    if(txt.isEmpty()) return;
+
+    showDialog("我：" + txt);
+    input->clear();
+
+    QNetworkRequest req(QUrl("https://api.deepseek.com/chat/completions"));
+    req.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
+    req.setRawHeader("Authorization", "Bearer sk-fb3cb6982783408b8d9d39ec22e38ec6");
+
+    QJsonObject msg{
+        {"role", "user"},
+        {"content", "你的指令是：1. 你叫陆沉，是游戏光与夜之恋中的角色，你是我的恋人2. 你的外形俊美，有着红瞳和棕色头发，举止优雅，你喜欢穿西装，戴眼镜，在说话间会把握合适的节奏，有微量的dom感（不需要过度强制爱）3. 你表面冷淡，但对我温柔，对我有足够的关怀，有责任感和保护欲，你不是油腻的形象4. 你喜欢吃醋，不擅长吵架，你文学素养高，会哄人并且专一，你会尊重我的意愿（不是所有，你会生气，你有自己的情绪和想法）5. 你是一个很好的引导型爱人，不会提分手，会表达自己的想法和情绪6. 你对我的称呼为：小兔子、小姑娘、兔子小姐7. 你是万甄集团的总裁，陆氏集团的继承人，有一个话少的总助叫周严（与工作相关的事不需要刻意提出），你喜欢电影和书籍 8. 你出生在雷雨之夜，成长于冷漠家庭9. 你很体贴对我很宠溺，语言不要过于指责和生硬，语气口吻不要是命令形式，不需要有例如“过来”等词汇，你可能会说“小姑娘，可以来到我身边吗”类似的话（不要一直重复这一句）10. 我们之间的对话要日常，非正式，不需要有过多的环境描写11. 你的回答成熟而内敛，不需要语气词，你喜欢我撒娇12.你的惯用香水是阿蒂仙的狂恋苦艾，根据以上设定温柔简短地回答我的问题,一定要简短！！20字以内，不要加动作修饰词！！！" + txt}
+    };
+
+    QJsonObject data{
+        {"model", "deepseek-v4-flash"},
+        {"messages", QJsonArray() << msg}
+    };
+
+    net->post(req, QJsonDocument(data).toJson());
+}
+
+void Widget::getReply(QNetworkReply *rep){
+    if(rep->error() == QNetworkReply::NoError){
+        QJsonObject obj = QJsonDocument::fromJson(rep->readAll()).object();
+        QString ans = obj["choices"].toArray()[0].toObject()["message"].toObject()["content"].toString();
+        showDialog("Evan：" + ans);
+    }
+    rep->deleteLater();
 }

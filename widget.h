@@ -7,10 +7,20 @@
 #include <QPixmap>
 #include <QPoint>
 #include <QPainter>
-//2.0新增
 #include <QMovie>
 #include <QSystemTrayIcon>
 #include <QMenu>
+//3.0新增
+#include <QMediaPlayer>
+#include <QAudioOutput>
+#include <QNetworkAccessManager>
+#include <QNetworkReply>
+#include <QLineEdit>
+#include <QPushButton>
+#include <QVBoxLayout>
+#include <QJsonDocument>
+#include <QJsonObject>
+#include<QJsonArray>
 class Widget : public QWidget
 {
     Q_OBJECT
@@ -37,6 +47,16 @@ private slots://功能定义
     void showPet();
     void showDialog(const QString &text);
     void clearDialog();
+    //3.0
+    void playMusic1();
+    void playMusic2();
+    void playMusic3();
+    void playMusic4();
+    void playMusic5();
+    void playMusic6();
+    void stopMusic();
+    void sendAI();
+    void getReply(QNetworkReply *reply);
 
 private:
     void Menu();          //右键菜单
@@ -50,11 +70,19 @@ private:
     QPoint m_dragPos;
     QTimer *m_dialogTimer;
     QMenu *m_rightMenu;
-    //2.0新增
     QMovie *m_movie;
     QPixmap m_currentPixmap;
     QSystemTrayIcon *m_trayIcon;//托盘
     QMenu *m_trayMenu;
+    //3.0
+    //音乐
+    QMediaPlayer *m_player;
+    QAudioOutput *m_audio;
+
+    //AI
+    QNetworkAccessManager *net;
+    QLineEdit *input;
+    QPushButton *btn;
 };
 
 #endif // WIDGET_H
